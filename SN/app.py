@@ -31,18 +31,29 @@ st.markdown("""
         /* -----------------------------------------------------------------
            KỸ THUẬT ÉP KHUNG CHỨA HIỆU ỨNG VÀ NHẠC PHỦ KÍN TOÀN MÀN HÌNH
            ----------------------------------------------------------------- */
-        iframe[srcdoc*="global-magic-container"] {
+        
+        /* Đưa toàn bộ hiệu ứng nền ra SAU CÙNG để không chặn vuốt cuộn trang trên Mobile */
+        iframe[srcdoc*="global-effects-layer"] {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
             width: 100vw !important;
             height: 100vh !important;
             border: none !important;
-            pointer-events: none !important; /* Click xuyên qua toàn bộ màn hình */
-            z-index: 999999 !important;
+            pointer-events: none !important;
+            z-index: -1 !important; /* Quan trọng nhất: Nằm dưới cùng để lướt màn hình mượt mà */
         }
         
-        /* Ép Khung pháo giấy phụ khi bấm nút dưới cùng cũng PHỦ KÍN TOÀN MÀN HÌNH */
+        /* Giữ ô nhạc nằm gọn gàng đúng vị trí thăng bằng 90px trong trang */
+        iframe[srcdoc*="music-player-container"] {
+            position: relative !important;
+            width: 100% !important;
+            height: 90px !important;
+            border: none !important;
+            z-index: 10 !important;
+        }
+        
+        /* Khung chứa pháo giấy phụ khi bấm nút dưới cùng */
         iframe[srcdoc*="btn-confetti-trigger"] {
             position: fixed !important;
             top: 0 !important;
@@ -223,110 +234,16 @@ elif st.session_state.stage == 'main':
     # Mã hóa tệp âm nhạc sinh nhật vui tươi từ máy tính của bạn
     bday_music_base64 = get_base64_audio("happy_birthday.mp3")
     
-    # --- SIÊU BẢN NHÚNG DUY NHẤT: TRÌNH PHÁT NHẠC + PHÁO GIẤY TOÀN MÀN HÌNH + BONG BÓNG ---
-    # Sử dụng chuỗi thô thông thường (không dùng f-string) để loại bỏ hoàn toàn lỗi SyntaxError dấu ngoặc nhọn
-    unified_magic_html = """
-    <div id="global-magic-container" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        pointer-events: none;
-        overflow: hidden;
-        z-index: 999999;
-    ">
-        <!-- Khung chứa bong bóng lơ lửng -->
-        <div id="bubble-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+    # --- KHỐI HIỆU ỨNG CHẠY TOÀN MÀN HÌNH PHÍA SAU NỀN ---
+    # Chứa pháo hoa tự rơi và bong bóng lơ lửng, nằm dưới cùng nên không bao giờ cản trở lướt màn hình
+    global_effects_html = """
+    <div id="global-effects-layer" style="position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; overflow:hidden;"></div>
 
-        <!-- Ô PHÁT NHẠC XINH XẮN -->
-        <div class="music-player-container" style="
-            position: absolute;
-            bottom: 120px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            max-width: 380px;
-            display: flex;
-            align-items: center;
-            background-color: #FFFFFF;
-            border: 2px solid #FADadd;
-            border-radius: 20px;
-            padding: 12px 18px;
-            box-shadow: 0px 8px 24px rgba(250, 218, 221, 0.7);
-            font-family: 'Arial', sans-serif;
-            justify-content: space-between;
-            height: 80px;
-            box-sizing: border-box;
-            pointer-events: auto;
-        ">
-            <div style="display: flex; align-items: center; gap: 12px; pointer-events: none;">
-                <!-- Đĩa nhạc xoay tròn xinh xắn -->
-                <div id="vinyl-disc" style="
-                    width: 46px;
-                    height: 46px;
-                    background: radial-gradient(circle, #333 30%, #FFB5A7 31%, #FFB5A7 40%, #333 41%);
-                    border-radius: 50%;
-                    border: 2px solid #FFFFFF;
-                    box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    animation: spin 3s linear infinite;
-                    animation-play-state: paused;
-                ">
-                    <span style="font-size: 14px;">🌸</span>
-                </div>
-                
-                <!-- Tên bài hát rộn rã vui tươi -->
-                <div>
-                    <div style="font-size: 14px; font-weight: bold; color: #8C6239; margin-bottom: 3px;">Nhạc Sinh Nhật Vui Tươi 🎵</div>
-                    <div style="font-size: 11px; color: #B5828C; font-style: italic;">Chạm nút bên cạnh để nghe nhé</div>
-                </div>
-            </div>
-
-            <!-- Nút phát nhạc thủ công màu hồng pastel xinh xắn -->
-            <button id="play-btn" style="
-                background-color: #FFB5A7;
-                color: white;
-                border: none;
-                border-radius: 50%;
-                width: 40px;
-                height: 40px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                box-shadow: 0px 3px 6px rgba(255,181,167,0.5);
-                outline: none;
-                font-size: 14px;
-                font-weight: bold;
-                pointer-events: auto;
-            ">▶</button>
-        </div>
-    </div>
-
-    <audio id="birthday-audio" loop preload="auto">
-        <source src="{bday_music_base64}" type="audio/mp3">
-        <source src="https://dl.dropboxusercontent.com/scl/fi/7iyn97i8b958j525g0shx/happy_birthday_vocals.mp3?rlkey=26i7eon6jkyom1d1dfsmf1z9e&dl=1" type="audio/mpeg">
-    </audio>
-
-    <style>
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-
+    <!-- Thư viện pháo giấy confetti -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
 
     <script>
-        const audio = document.getElementById('birthday-audio');
-        const playBtn = document.getElementById('play-btn');
-        const vinyl = document.getElementById('vinyl-disc');
-        
-        audio.volume = 0.8;
-
+        // 1. Kích hoạt pháo giấy tông màu đất ấm áp bắn chéo bao phủ TOÀN MÀN HÌNH
         function triggerConfetti() {
             var duration = 5 * 1000;
             var end = Date.now() + duration;
@@ -353,38 +270,12 @@ elif st.session_state.stage == 'main':
                 }
             }());
         }
-
-        // Kích hoạt pháo hoa khi bắt đầu
+        
+        // Gọi pháo hoa rực rỡ ngay lập tức khi mở trang
         triggerConfetti();
 
-        playBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (AudioContext) {
-                const context = new AudioContext();
-                if (context.state === 'suspended') {
-                    context.resume();
-                }
-            }
-
-            if (audio.paused) {
-                audio.play().then(() => {
-                    playBtn.innerText = '⏸';
-                    vinyl.style.animationPlayState = 'running';
-                    triggerConfetti();
-                }).catch(err => {
-                    console.log("Lỗi phát nhạc:", err);
-                });
-            } else {
-                audio.pause();
-                playBtn.innerText = '▶';
-                vinyl.style.animationPlayState = 'paused';
-            }
-        });
-
-        // Hiệu ứng bong bóng
-        const bubbleContainer = document.getElementById('bubble-layer');
+        // 2. Hiệu ứng bong bóng và trái tim bay lướt nhẹ nhàng khắp màn hình nền
+        const bubbleContainer = document.getElementById('global-effects-layer');
         const icons = ['🌸', '🎈', '💖', '✨', '💕', '🧸'];
         
         function createBubble() {
@@ -394,7 +285,7 @@ elif st.session_state.stage == 'main':
             bubble.style.bottom = '-50px';
             bubble.style.left = Math.random() * 100 + 'vw';
             bubble.style.fontSize = (Math.random() * 20 + 15) + 'px';
-            bubble.style.opacity = Math.random() * 0.7 + 0.3;
+            bubble.style.opacity = Math.random() * 0.4 + 0.2; // Nhẹ nhàng tinh tế ở phía sau
             bubble.style.pointerEvents = 'none';
             
             const duration = Math.random() * 6 + 6;
@@ -415,10 +306,113 @@ elif st.session_state.stage == 'main':
 
         setInterval(createBubble, 500);
     </script>
+    """
+    
+    # --- KHỐI Ô PHÁT NHẠC MANUAL ĐỘC LẬP (CAO 90PX) ---
+    custom_music_player_html = """
+    <div class="music-player-container" style="
+        display: flex;
+        align-items: center;
+        background-color: #FFFFFF;
+        border: 2px solid #FADadd;
+        border-radius: 16px;
+        padding: 10px 15px;
+        box-shadow: 0px 4px 12px rgba(250, 218, 221, 0.4);
+        font-family: 'Arial', sans-serif;
+        justify-content: space-between;
+        height: 70px;
+        box-sizing: border-box;
+    ">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <!-- Đĩa nhạc xoay tròn xinh xắn -->
+            <div id="vinyl-disc" style="
+                width: 44px;
+                height: 44px;
+                background: radial-gradient(circle, #333 30%, #FFB5A7 31%, #FFB5A7 40%, #333 41%);
+                border-radius: 50%;
+                border: 2px solid #FFFFFF;
+                box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                animation: spin 3s linear infinite;
+                animation-play-state: paused;
+            ">
+                <span style="font-size: 14px;">🌸</span>
+            </div>
+            
+            <!-- Tên bài hát rộn rã vui tươi -->
+            <div>
+                <div style="font-size: 14px; font-weight: bold; color: #8C6239; margin-bottom: 3px;">Nhạc Sinh Nhật Vui Tươi 🎵</div>
+                <div style="font-size: 11px; color: #B5828C; font-style: italic;">Chạm nút bên cạnh để nghe nhé</div>
+            </div>
+        </div>
+
+        <!-- Nút phát nhạc thủ công màu hồng pastel xinh xắn -->
+        <button id="play-btn" style="
+            background-color: #FFB5A7;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0px 3px 6px rgba(255,181,167,0.5);
+            outline: none;
+            font-size: 14px;
+            font-weight: bold;
+        ">▶</button>
+    </div>
+
+    <audio id="birthday-audio" loop preload="auto">
+        <source src="{bday_music_base64}" type="audio/mp3">
+        <source src="https://dl.dropboxusercontent.com/scl/fi/7iyn97i8b958j525g0shx/happy_birthday_vocals.mp3?rlkey=26i7eon6jkyom1d1dfsmf1z9e&dl=1" type="audio/mpeg">
+    </audio>
+
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+    <script>
+        const audio = document.getElementById('birthday-audio');
+        const playBtn = document.getElementById('play-btn');
+        const vinyl = document.getElementById('vinyl-disc');
+        
+        audio.volume = 0.8;
+
+        playBtn.addEventListener('click', () => {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                const context = new AudioContext();
+                if (context.state === 'suspended') {
+                    context.resume();
+                }
+            }
+
+            if (audio.paused) {
+                audio.play().then(() => {
+                    playBtn.innerText = '⏸';
+                    vinyl.style.animationPlayState = 'running';
+                }).catch(err => {
+                    console.log("Lỗi phát nhạc:", err);
+                });
+            } else {
+                audio.pause();
+                playBtn.innerText = '▶';
+                vinyl.style.animationPlayState = 'paused';
+            }
+        });
+    </script>
     """.replace("{bday_music_base64}", bday_music_base64)
     
-    # Nhúng tổ hợp nhạc, pháo hoa và bong bóng hoàn hảo toàn màn hình
-    components.html(unified_magic_html)
+    # Nhúng hiệu ứng nền bay phía sau cùng (Tuyệt đối không chặn cử chỉ lướt màn hình)
+    components.html(global_effects_html)
     
     # Biểu tượng hộp quà phía trên tiêu đề lời chúc
     st.markdown("<p style='text-align: center; font-size: 35px; margin-bottom: 0;'>🎁✨</p>", unsafe_allow_html=True)
@@ -437,10 +431,13 @@ elif st.session_state.stage == 'main':
         </div>
     """, unsafe_allow_html=True)
     
+    # Nhúng ô trình phát nhạc Pastel xinh xắn độc lập (Đặt bình thường trong trang)
+    components.html(custom_music_player_html, height=90)
+    
     # Nhãn danh sách album ảnh vuốt ngang
     st.markdown('<div style="padding-left: 10px; font-weight: bold; color: #8C6239; font-size: 16px; margin-top: 15px;">📸 Những mảnh kỷ niệm đáng nhớ:</div>', unsafe_allow_html=True)
     
-    # --- ALBUM 8 ẢNH THẬT TRÊN INTERNET CỦA BẠN (CẬP NHẬT TỪ POSTIMAGES) ---
+    # --- ALBUM 8 ẢNH THẬT TRÊN INTERNET CỦA BẠN (POSTIMAGES) ---
     list_anh = [
         "https://i.postimg.cc/9z0vGpXK/01.jpg",
         "https://i.postimg.cc/mz5pdvZ5/02.jpg",
