@@ -155,24 +155,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- HÀM MÃ HÓA TÀI NGUYÊN (ẢNH/NHẠC) TRÊN MÁY TÍNH THÀNH CHUỖI BASE64 ---
-def get_base64_image(file_path):
-    if os.path.exists(file_path):
-        with open(file_path, "rb") as file:
-            encoded = base64.b64encode(file.read()).decode()
-        ext = file_path.split(".")[-1].lower()
-        if ext in ["jpg", "jpeg"]:
-            return f"data:image/jpeg;base64,{encoded}"
-        elif ext == "png":
-            return f"data:image/png;base64,{encoded}"
-    # Trả về ảnh giữ chỗ nếu file thiếu
-    return "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=180"
-
+# --- HÀM MÃ HÓA AUDIO TRÊN MÁY TÍNH THÀNH CHUỖI BASE64 ---
 def get_base64_audio(file_path):
     if os.path.exists(file_path):
-        with open(file_path, "rb") as file:
-            encoded = base64.b64encode(file.read()).decode()
-        return f"data:audio/mp3;base64,{encoded}"
+        try:
+            with open(file_path, "rb") as file:
+                encoded = base64.b64encode(file.read()).decode()
+            return f"data:audio/mp3;base64,{encoded}"
+        except Exception:
+            pass
     return ""
 
 
@@ -233,7 +224,7 @@ elif st.session_state.stage == 'main':
     bday_music_base64 = get_base64_audio("happy_birthday.mp3")
     
     # --- SIÊU BẢN NHÚNG DUY NHẤT: TRÌNH PHÁT NHẠC + PHÁO GIẤY TOÀN MÀN HÌNH + BONG BÓNG ---
-    # TẤT CẢ nằm trong một iframe lớn phủ toàn màn hình, loại bỏ triệt để lỗi phân quyền và chặn nút bấm
+    # Sử dụng chuỗi thô thông thường (không dùng f-string) để loại bỏ hoàn toàn lỗi SyntaxError dấu ngoặc nhọn
     unified_magic_html = """
     <div id="global-magic-container" style="
         position: fixed;
@@ -241,14 +232,14 @@ elif st.session_state.stage == 'main':
         left: 0;
         width: 100vw;
         height: 100vh;
-        pointer-events: none; /* Cho phép click xuyên qua lớp nền */
+        pointer-events: none;
         overflow: hidden;
         z-index: 999999;
     ">
-        <!-- Khung chứa bong bóng lơ lửng và pháo hoa rụng khắp màn hình -->
+        <!-- Khung chứa bong bóng lơ lửng -->
         <div id="bubble-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
 
-        <!-- Ô PHÁT NHẠC XINH XẮN (Nằm ở vị trí phía dưới, có thể click tương tác mượt mà) -->
+        <!-- Ô PHÁT NHẠC XINH XẮN -->
         <div class="music-player-container" style="
             position: absolute;
             bottom: 120px;
@@ -267,7 +258,7 @@ elif st.session_state.stage == 'main':
             justify-content: space-between;
             height: 80px;
             box-sizing: border-box;
-            pointer-events: auto; /* KÍCH HOẠT NHẬN CLICK CHO Ô NHẠC */
+            pointer-events: auto;
         ">
             <div style="display: flex; align-items: center; gap: 12px; pointer-events: none;">
                 <!-- Đĩa nhạc xoay tròn xinh xắn -->
@@ -315,9 +306,8 @@ elif st.session_state.stage == 'main':
         </div>
     </div>
 
-    <!-- Tải nhạc cực kỳ chất lượng: Ưu tiên nhạc cục bộ máy tính của bạn và dự phòng bài hát ngọt ngào từ Dropbox -->
     <audio id="birthday-audio" loop preload="auto">
-        <source src="MUSIC_DATA_PLACEHOLDER" type="audio/mp3">
+        <source src="{bday_music_base64}" type="audio/mp3">
         <source src="https://dl.dropboxusercontent.com/scl/fi/7iyn97i8b958j525g0shx/happy_birthday_vocals.mp3?rlkey=26i7eon6jkyom1d1dfsmf1z9e&dl=1" type="audio/mpeg">
     </audio>
 
@@ -328,7 +318,6 @@ elif st.session_state.stage == 'main':
         }
     </style>
 
-    <!-- Thư viện pháo giấy confetti toàn diện -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
 
     <script>
@@ -338,7 +327,6 @@ elif st.session_state.stage == 'main':
         
         audio.volume = 0.8;
 
-        // 1. Hàm kích hoạt hiệu ứng pháo giấy tông màu ấm áp rải khắp màn hình
         function triggerConfetti() {
             var duration = 5 * 1000;
             var end = Date.now() + duration;
@@ -366,14 +354,12 @@ elif st.session_state.stage == 'main':
             }());
         }
 
-        // Tự động bắn pháo hoa chào mừng khi Hà Anh bước vào màn hình chính
+        // Kích hoạt pháo hoa khi bắt đầu
         triggerConfetti();
 
-        // 2. Xử lý sự kiện nhấn nút phát nhạc thủ công chuẩn xác, giải quyết triệt để lỗi im lặng
         playBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Ngăn sự kiện chạm bị truyền ra ngoài
+            e.stopPropagation();
             
-            // Ép buộc trình duyệt giải phóng luồng âm thanh bị khóa
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (AudioContext) {
                 const context = new AudioContext();
@@ -386,9 +372,9 @@ elif st.session_state.stage == 'main':
                 audio.play().then(() => {
                     playBtn.innerText = '⏸';
                     vinyl.style.animationPlayState = 'running';
-                    triggerConfetti(); // Bắn thêm pháo hoa khi bắt đầu nhạc!
+                    triggerConfetti();
                 }).catch(err => {
-                    console.log("Lỗi luồng phát nhạc:", err);
+                    console.log("Lỗi phát nhạc:", err);
                 });
             } else {
                 audio.pause();
@@ -397,7 +383,7 @@ elif st.session_state.stage == 'main':
             }
         });
 
-        // 3. Hiệu ứng bong bóng và trái tim ngọt ngào bay lơ lửng
+        // Hiệu ứng bong bóng
         const bubbleContainer = document.getElementById('bubble-layer');
         const icons = ['🌸', '🎈', '💖', '✨', '💕', '🧸'];
         
@@ -411,13 +397,13 @@ elif st.session_state.stage == 'main':
             bubble.style.opacity = Math.random() * 0.7 + 0.3;
             bubble.style.pointerEvents = 'none';
             
-            const duration = Math.random() * 6 + 6; // Thời gian bay từ 6s - 12s
+            const duration = Math.random() * 6 + 6;
             bubble.style.transition = 'transform ' + duration + 's linear, opacity ' + duration + 's ease-out';
             
             bubbleContainer.appendChild(bubble);
             
             setTimeout(() => {
-                const sideMovement = (Math.random() - 0.5) * 150; // Quỹ đạo lắc lư nhẹ sang hai bên
+                const sideMovement = (Math.random() - 0.5) * 150;
                 bubble.style.transform = 'translate(' + sideMovement + 'px, -110vh)';
                 bubble.style.opacity = '0';
             }, 100);
@@ -427,10 +413,9 @@ elif st.session_state.stage == 'main':
             }, duration * 1000);
         }
 
-        // Tạo bong bóng/trái tim mới cứ mỗi 500ms
         setInterval(createBubble, 500);
     </script>
-    """.replace("MUSIC_DATA_PLACEHOLDER", bday_music_base64)
+    """.replace("{bday_music_base64}", bday_music_base64)
     
     # Nhúng tổ hợp nhạc, pháo hoa và bong bóng hoàn hảo toàn màn hình
     components.html(unified_magic_html)
@@ -455,16 +440,16 @@ elif st.session_state.stage == 'main':
     # Nhãn danh sách album ảnh vuốt ngang
     st.markdown('<div style="padding-left: 10px; font-weight: bold; color: #8C6239; font-size: 16px; margin-top: 15px;">📸 Những mảnh kỷ niệm đáng nhớ:</div>', unsafe_allow_html=True)
     
-    # --- ĐỌC 8 ẢNH BẢO MẬT TRỰC TIẾP TỪ THƯ MỤC CỦA BẠN ---
+    # --- ALBUM 8 ẢNH THẬT TRÊN INTERNET CỦA BẠN (CẬP NHẬT TỪ POSTIMAGES) ---
     list_anh = [
-        get_base64_image("images/01.jpg"),
-        get_base64_image("images/02.jpg"),
-        get_base64_image("images/03.jpg"),
-        get_base64_image("images/04.jpg"),
-        get_base64_image("images/05.jpg"),
-        get_base64_image("images/06.jpg"),
-        get_base64_image("images/07.png"),
-        get_base64_image("images/08.jpg"),
+        "https://i.postimg.cc/9z0vGpXK/01.jpg",
+        "https://i.postimg.cc/mz5pdvZ5/02.jpg",
+        "https://i.postimg.cc/vgN2PJ8C/03.jpg",
+        "https://i.postimg.cc/sQNHnkfL/04.jpg",
+        "https://i.postimg.cc/ftrqHGT4/05.jpg",
+        "https://i.postimg.cc/JD2YTf41/06.jpg",
+        "https://i.postimg.cc/8ffKxZj6/07.png",
+        "https://i.postimg.cc/p55G3sph/08.jpg"
     ]
     
     # Tạo cấu trúc HTML băng chuyền ảnh vuốt ngang tỉ lệ 4:3
